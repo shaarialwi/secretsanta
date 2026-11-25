@@ -8,7 +8,7 @@ returns jsonb language plpgsql security definer set search_path=public,pg_temp a
 declare me uuid:=auth.uid(); r public.santa_rooms; p public.santa_players; ids uuid[]; n int; i int; pic text; secret text;
 begin
 if me is null then raise exception 'Sign in first'; end if;
-if action='create' then
+if action in ('create','create_registration') then
  secret:=replace(gen_random_uuid()::text,'-','');
  insert into santa_rooms(code,host,title,budget,moderator_key_hash)
  values(upper(substr(replace(gen_random_uuid()::text,'-',''),1,10)),me,left(coalesce(nullif(trim(payload->>'title'),''),'Strategy Secret Santa'),100),left(coalesce(payload->>'budget','RM50'),50),encode(sha256(convert_to(secret,'UTF8')),'hex')) returning * into r;
@@ -21,7 +21,7 @@ if action='moderator_login' then
  secret:=trim(coalesce(payload->>'key',''));
  if r.moderator_key_hash is null or length(secret)<>32 or r.moderator_key_hash<>encode(sha256(convert_to(secret,'UTF8')),'hex') then raise exception 'Incorrect moderator access key'; end if;
  update santa_rooms set host=me where id=r.id returning * into r;
-elsif action='join' then
+elsif action in ('join','register') then
  if r.phase<>'lobby' and p.uid is null then raise exception 'Registration is closed'; end if;
  if coalesce(length(trim(payload->>'name')),0)=0 then raise exception 'Enter your name'; end if;
  if payload ? 'photo' then
